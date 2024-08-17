@@ -374,7 +374,7 @@ export async function onIdentify(this: WebSocket, data: Payload) {
 			data: {
 				user: user.toPublicUser(),
 				activities: session.activities,
-				client_status: session.client_status,
+				client_status: session?.client_status ?? [],
 				status: session.status,
 			},
 		} as PresenceUpdateEvent),
