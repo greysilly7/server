@@ -29,8 +29,56 @@ export function BodyParser(opts?: OptionsJson) {
 
 		jsonParser(req, res, (err) => {
 			if (err) {
-				// TODO: different errors for body parser (request size limit, wrong body type, invalid body, ...)
-				return next(new HTTPError("Invalid Body", 400));
+				switch (err.type) {
+					case "entity.too.large":
+						return next(
+							new HTTPError("Request body too large", 413),
+						);
+					case "entity.parse.failed":
+						return next(new HTTPError("Invalid JSON body", 400));
+					case "entity.verify.failed":
+						return next(
+							new HTTPError("Entity verification failed", 403),
+						);
+					case "request.aborted":
+						return next(new HTTPError("Request aborted", 400));
+					case "request.size.invalid":
+						return next(
+							new HTTPError(
+								"Request size did not match content length",
+								400,
+							),
+						);
+					case "stream.encoding.set":
+						return next(
+							new HTTPError(
+								"Stream encoding should not be set",
+								500,
+							),
+						);
+					case "stream.not.readable":
+						return next(
+							new HTTPError("Stream is not readable", 500),
+						);
+					case "parameters.too.many":
+						return next(new HTTPError("Too many parameters", 413));
+					case "charset.unsupported":
+						return next(
+							new HTTPError(
+								`Unsupported charset "${err.charset}"`,
+								415,
+							),
+						);
+					case "encoding.unsupported":
+						return next(
+							new HTTPError(
+								`Unsupported content encoding "${err.encoding}"`,
+								415,
+							),
+						);
+					default:
+						return next(new HTTPError("Invalid Body", 400));
+				}
 			}
 			next();
 		});
