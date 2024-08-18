@@ -41,7 +41,6 @@ import {
 	Permissions,
 	PresenceUpdateEvent,
 	PrivateSessionProjection,
-	PrivateUserProjection,
 	PublicUser,
 	PublicUserProjection,
 	ReadState,
@@ -84,10 +83,7 @@ export async function onIdentify(this: WebSocket, data: Payload) {
 	this.capabilities = new Capabilities(identify.capabilities || 0);
 	this.large_threshold = identify.large_threshold || 250;
 
-	const user = await tryGetUserFromToken(identify.token, {
-		relations: ["relationships", "relationships.to", "settings"],
-		select: [...PrivateUserProjection, "relationships"],
-	});
+	const user = await tryGetUserFromToken(identify.token);
 	if (!user) return this.close(CLOSECODES.Authentication_failed);
 	this.user_id = user.id;
 
