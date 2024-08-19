@@ -108,8 +108,8 @@ export class User extends BaseClass {
 	@Column({ nullable: true, type: "simple-array" })
 	theme_colors?: number[];
 
-	@Column({ nullable: true })
-	pronouns?: string;
+	@Column()
+	pronouns: string = "";
 
 	@Column({ nullable: true, select: false })
 	phone?: string; // phone number of the user
