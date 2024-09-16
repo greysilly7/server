@@ -218,7 +218,7 @@ export async function onSelectProtocol(this: WebSocket, payload: Payload) {
 
 	console.debug("onSelectProtocol sdp serialized\n", sdpAnswer);
 	await Send(this, {
-		op: VoiceOPCodes.SELECT_PROTOCOL_ACK,
+		op: VoiceOPCodes.SESSION_DESCRIPTION,
 		d: {
 			// audio_codec: audioCodec.mimeType.split("/")[1],
 			// video_codec: videoCodec.mimeType.split("/")[1],
