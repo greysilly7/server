@@ -16,7 +16,7 @@
 	along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-import { Payload, WebSocket } from "@spacebar/gateway";
+import { OPCODES, Payload, WebSocket } from "@spacebar/gateway";
 import { VoiceOPCodes } from "../util";
 import { onBackendVersion } from "./BackendVersion";
 import { onHeartbeat } from "./Heartbeat";
@@ -24,10 +24,15 @@ import { onIdentify } from "./Identify";
 import { onSelectProtocol } from "./SelectProtocol";
 import { onSpeaking } from "./Speaking";
 import { onVideo } from "./Video";
+import { OPCodes } from "../../util/util/Constants";
 
 export type OPCodeHandler = (this: WebSocket, data: Payload) => any;
 
-export default {
+// Create a type that encompasses both OPCodes and VoiceOPCodes
+type AllOPCodes = OPCODES | VoiceOPCodes;
+
+// Define the handler object with the combined type
+const handlers: { [key in AllOPCodes]?: OPCodeHandler } = {
 	[VoiceOPCodes.HEARTBEAT]: onHeartbeat,
 	[VoiceOPCodes.IDENTIFY]: onIdentify,
 	[VoiceOPCodes.VOICE_BACKEND_VERSION]: onBackendVersion,
@@ -35,3 +40,5 @@ export default {
 	[VoiceOPCodes.SPEAKING]: onSpeaking,
 	[VoiceOPCodes.SELECT_PROTOCOL]: onSelectProtocol,
 };
+
+export default handlers;
