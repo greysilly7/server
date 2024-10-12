@@ -30,11 +30,6 @@ import {
 } from "@spacebar/util";
 import { genVoiceToken } from "../util/SessionUtils";
 import { check } from "./instanceOf";
-// TODO: check if a voice server is setup
-
-// Notice: Bot users respect the voice channel's user limit, if set.
-// When the voice channel is full, you will not receive the Voice State Update or Voice Server Update events in response to your own Voice State Update.
-// Having MANAGE_CHANNELS permission bypasses this limit and allows you to join regardless of the channel being full or not.
 
 export async function onVoiceStateUpdate(this: WebSocket, data: Payload) {
 	check.call(this, VoiceStateUpdateSchema, data.d);
@@ -49,16 +44,16 @@ export async function onVoiceStateUpdate(this: WebSocket, data: Payload) {
 		});
 		if (
 			voiceState.session_id !== this.session_id &&
-			body.channel_id === null
+			body.channel_id === null &&
+			body.guild_id === null
 		) {
-			//Should we also check guild_id === null?
-			//changing deaf or mute on a client that's not the one with the same session of the voicestate in the database should be ignored
+			// changing deaf or mute on a client that's not the one with the same session of the voicestate in the database should be ignored
 			return;
 		}
 
 		if (voiceState.channel_id !== body.channel_id) isChanged = true;
 
-		//If a user change voice channel between guild we should send a left event first
+		// If a user changes voice channel between guilds, we should send a left event first
 		if (
 			voiceState.guild_id !== body.guild_id &&
 			voiceState.session_id === this.session_id
@@ -70,10 +65,11 @@ export async function onVoiceStateUpdate(this: WebSocket, data: Payload) {
 			});
 		}
 
-		//The event send by Discord's client on channel leave has both guild_id and channel_id as null
+		// The event sent by Discord's client on channel leave has both guild_id and channel_id as null
 		if (body.guild_id === null) body.guild_id = voiceState.guild_id;
 		voiceState.assign(body);
 	} catch (error) {
+		console.error("Error finding voice state:", error);
 		voiceState = VoiceState.create({
 			...body,
 			user_id: this.user_id,
@@ -83,28 +79,38 @@ export async function onVoiceStateUpdate(this: WebSocket, data: Payload) {
 		});
 	}
 
-	// 'Fix' for this one voice state error. TODO: Find out why this is sent
-	// It seems to be sent on client load,
-	// so maybe its trying to find which server you were connected to before disconnecting, if any?
+	// 'Fix' for this one voice state error. It seems to be sent on client load,
+	// so maybe it's trying to find which server you were connected to before disconnecting, if any?
 	if (body.guild_id == null) {
 		return;
 	}
 
-	//TODO the member should only have these properties: hoisted_role, deaf, joined_at, mute, roles, user
-	//TODO the member.user should only have these properties: avatar, discriminator, id, username
-	//TODO this may fail
-	voiceState.member = await Member.findOneOrFail({
-		where: { id: voiceState.user_id, guild_id: voiceState.guild_id },
-		relations: ["user", "roles"],
-	});
+	try {
+		const member = await Member.findOneOrFail({
+			where: { id: voiceState.user_id, guild_id: voiceState.guild_id },
+			relations: ["user", "roles"],
+		});
+		// Ensure the member object has only the specified properties
+		voiceState.member = member; /* {
+            hoisted_role: member.roles.find((r) => r.hoist),
+            deaf: member.deaf,
+            joined_at: member.joined_at,
+            mute: member.mute,
+            roles: member.roles,
+            user: member.user,
+        };
+				*/
+	} catch (error) {
+		console.error("Error finding member:", error);
+		return;
+	}
 
-	//If the session changed we generate a new token
+	// If the session changed, we generate a new token
 	if (voiceState.session_id !== this.session_id)
 		voiceState.token = genVoiceToken();
 	voiceState.session_id = this.session_id;
 
-	// eslint-disable-next-line @typescript-eslint/no-unused-vars
-	const { id, ...newObj } = voiceState;
+	const { ...newObj } = voiceState;
 
 	await Promise.all([
 		voiceState.save(),
@@ -115,32 +121,34 @@ export async function onVoiceStateUpdate(this: WebSocket, data: Payload) {
 		} as VoiceStateUpdateEvent),
 	]);
 
-	//If it's null it means that we are leaving the channel and this event is not needed
+	// If it's null, it means that we are leaving the channel and this event is not needed
 	if ((isNew || isChanged) && voiceState.channel_id !== null) {
 		const guild = await Guild.findOne({
 			where: { id: voiceState.guild_id },
 		});
 		const regions = Config.get().regions;
-		let guildRegion: Region;
-		if (guild && guild.region) {
-			guildRegion = regions.available.filter(
-				(r) => r.id === guild.region,
-			)[0];
+		let guildRegion: Region | undefined;
+		if (guild?.region) {
+			guildRegion = regions.available.find((r) => r.id === guild.region);
 		} else {
-			guildRegion = regions.available.filter(
+			guildRegion = regions.available.find(
 				(r) => r.id === regions.default,
-			)[0];
+			);
 		}
 
-		await emitEvent({
-			event: "VOICE_SERVER_UPDATE",
-			data: {
-				token: voiceState.token,
+		if (guildRegion) {
+			await emitEvent({
+				event: "VOICE_SERVER_UPDATE",
+				data: {
+					token: voiceState.token,
+					guild_id: voiceState.guild_id,
+					endpoint: guildRegion.endpoint,
+				},
 				guild_id: voiceState.guild_id,
-				endpoint: guildRegion.endpoint,
-			},
-			guild_id: voiceState.guild_id,
-			user_id: voiceState.user_id,
-		} as VoiceServerUpdateEvent);
+				user_id: voiceState.user_id,
+			} as VoiceServerUpdateEvent);
+		} else {
+			console.error("No valid region found for guild:", guild?.id);
+		}
 	}
 }
