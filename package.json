@@ -107,7 +107,8 @@
 		"typeorm": "^0.3.17",
 		"typescript-json-schema": "^0.50.1",
 		"wretch": "^2.6.0",
-		"ws": "^8.17.1"
+		"ws": "^8.17.1",
+		"@yukikaze-bot/erlpack": "^1.0.1"
 	},
 	"_moduleAliases": {
 		"@spacebar/api": "dist/api",
