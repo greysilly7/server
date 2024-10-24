@@ -73,11 +73,13 @@
             runHook postInstall
           '';
         };
-        devShell = pkgs.mkShell {
-          buildInputs = with pkgs; [
-            nodejs
-            nodePackages.typescript
-          ];
+        devShells = {
+          default = pkgs.mkShell {
+            buildInputs = with pkgs; [
+              nodejs_latest
+              nodePackages.typescript
+            ];
+          };
         };
       }
     );
